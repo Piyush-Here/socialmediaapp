@@ -1,0 +1,66 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    # Deliberately no published ports: MongoDB is reachable only from other containers on this
+    # compose network. Do NOT add "27017:27017" — this instance has no authentication.
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      MONGODB_URI: mongodb://mongo:27017/socialapp
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (openssl rand -hex 48)}
+      UPLOADS_DIR: /data/uploads
+      APP_URL: "${APP_URL:?Set APP_URL in .env, for example https://example.com}"
+      MAIL_FROM: "${MAIL_FROM:?Set MAIL_FROM in .env, for example Sociable <no-reply@example.com>}"
+      SMTP_HOST: "${SMTP_HOST:?Set SMTP_HOST in .env, see the Email section of the README}"
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  # Local-only fake mail server so you can test email flows without a real provider:
+  #   docker compose --profile local up --build   then open http://localhost:8025 to read the emails.
+  mailpit:
+    image: axllent/mailpit:latest
+    profiles: ["local"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"
+
+  web:
+    build: ./client
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  mongo_data:
+  uploads:
+  caddy_data:
+  caddy_config:
