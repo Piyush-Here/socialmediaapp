@@ -11,9 +11,6 @@ docker-compose.yml   mongo + api + web (Caddy: static client, reverse proxy, aut
 ```
 
 ## Screenshots
-
-## Screenshots
-
 | | |
 |---|---|
 | ![Login page](docs/screenshots/login.png)<br>**Login** | ![Composer with image preview](docs/screenshots/post.png)<br>**Create a post with an image** |
